@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="js.css">
+</head>
+<body class="light-mode">
+    <div class="container">
+        <h1>Task Manager</h1>
+        <div class="controls">
+            <input type="text" id="taskInput" placeholder="Enter a new task">
+            <button id="addTask" draggable="true"><i class="fas fa-plus"></i></button>
+            <button id="removeSelected"><i class="fas fa-trash-alt"></i></button>
+            <button id="clearAll"><i class="fas fa-trash"></i></button>
+            <button id="themeMode"><i class="fas fa-moon"></i></button>
+            <button id="sortAsc"><i class="fas fa-sort-alpha-up"></i></button>
+            <button id="sortDesc"><i class="fas fa-sort-alpha-down"></i></button>
+            <button id="resetOrder"><i class="fas fa-undo"></i></button>
+        </div>
+        <ul id="taskList" class="sortable"></ul>
+        <div class="stats">
+            <p>Total Tasks: <span id="totalCount">0</span></p>
+            <p>Completed Tasks: <span id="completedCount">0</span></p>
+        </div>
+    </div>
+
+    <script>
+        const taskInput = document.getElementById('taskInput');
+        const taskList = document.getElementById('taskList');
+        const totalCount = document.getElementById('totalCount');
+        const completedCount = document.getElementById('completedCount');
+        const sortAscButton = document.getElementById('sortAsc');
+        const sortDescButton = document.getElementById('sortDesc');
+        const resetOrderButton = document.getElementById('resetOrder');
+        const addTaskButton = document.getElementById('addTask');
+
+        let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+        let originalTasks = [...tasks];  // Store the original order
+
+        function loadTasks() {
+            tasks.forEach(task => {
+                addTaskToDOM(task.text, task.completed);
+            });
+            updateCounts();
+        }
+
+        function addTaskToDOM(taskText, completed = false) {
+            const li = document.createElement('li');
+            li.textContent = taskText;
+            li.setAttribute('draggable', 'true');
+            if (completed) {
+                li.classList.add('completed');
+            }
+            li.addEventListener('click', () => {
+                li.classList.toggle('completed');
+                li.classList.toggle('selected');
+                updateCounts();
+                saveTasks();
+            });
+
+            li.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', taskText);
+                li.classList.add('dragging');
+            });
+
+            li.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                const dragging = document.querySelector('.dragging');
+                const current = e.target;
+                if (current !== dragging && current.tagName === 'LI') {
+                    const rect = current.getBoundingClientRect();
+                    const offset = e.clientY - rect.top;
+                    if (offset > rect.height / 2) {
+                        current.after(dragging);
+                    } else {
+                        current.before(dragging);
+                    }
+                }
+            });
+
+            li.addEventListener('dragend', () => {
+                document.querySelectorAll('li').forEach(li => li.classList.remove('dragging'));
+                saveTasks();  // Save the current dragged order
+            });
+
+            taskList.appendChild(li);
+        }
+
+        function saveTasks() {
+            tasks = Array.from(taskList.querySelectorAll('li')).map(li => ({
+                text: li.textContent,
+                completed: li.classList.contains('completed')
+            }));
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+        }
+
+        document.getElementById('addTask').addEventListener('click', () => {
+            const taskText = taskInput.value.trim();
+            if (taskText === '') return;
+
+            tasks.push({ text: taskText, completed: false });
+            originalTasks.push({ text: taskText, completed: false });  // Add to originalTasks
+            addTaskToDOM(taskText);
+            taskInput.value = '';
+            saveTasks();
+        });
+
+        document.getElementById('removeSelected').addEventListener('click', () => {
+            const completedTasks = document.querySelectorAll('.completed');
+            completedTasks.forEach(task => task.remove());
+            tasks = tasks.filter(task => !task.completed);
+            saveTasks();
+            updateCounts();
+        });
+
+        document.getElementById('clearAll').addEventListener('click', () => {
+            taskList.innerHTML = '';
+            localStorage.removeItem('tasks');
+            tasks = [];
+            originalTasks = [];  // Clear original order
+            updateCounts();
+        });
+
+        document.getElementById('themeMode').addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            document.body.classList.toggle('light-mode');
+            const themeIcon = document.getElementById('themeMode').querySelector('i');
+            themeIcon.classList.toggle('fa-moon');
+            themeIcon.classList.toggle('fa-sun');
+        });
+
+        sortAscButton.addEventListener('click', () => {
+            tasks.sort((a, b) => a.text.localeCompare(b.text));
+            renderTasks();
+        });
+
+        sortDescButton.addEventListener('click', () => {
+            tasks.sort((a, b) => b.text.localeCompare(a.text));
+            renderTasks();
+        });
+
+        resetOrderButton.addEventListener('click', () => {
+            taskList.innerHTML = '';  // Clear current task list
+            originalTasks.forEach(task => {
+                addTaskToDOM(task.text, task.completed);  // Re-render tasks in the original order
+            });
+            updateCounts();
+            saveTasks();  // Save the original order again to localStorage
+        });
+
+        function renderTasks() {
+            taskList.innerHTML = '';
+            tasks.forEach(task => {
+                addTaskToDOM(task.text, task.completed);
+            });
+            updateCounts();
+            saveTasks();
+        }
+
+        function updateCounts() {
+            const tasks = taskList.querySelectorAll('li');
+            const completedTasks = taskList.querySelectorAll('.completed');
+            totalCount.textContent = tasks.length;
+            completedCount.textContent = completedTasks.length;
+        }
+
+        addTaskButton.addEventListener('dragstart', () => {
+            addTaskButton.style.backgroundColor = "#ddd";
+        });
+
+        addTaskButton.addEventListener('dragend', () => {
+            addTaskButton.style.backgroundColor = "";
+        });
+
+        loadTasks();
+    </script>
+</body>
+</html>
